@@ -4,7 +4,12 @@ const fs = require('fs');
 
 const app = express();
 app.use(express.json({ limit: '20mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname)));
+
+// Serve index.html for root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // ── DATA DIRECTORY ──
 const DATA = path.join(__dirname, 'data');
