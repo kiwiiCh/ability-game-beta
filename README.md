@@ -1,28 +1,37 @@
-# 🎮 Ability Game
+# ⚔ Ability Game v2.0
 *made by Kii Akira*
 
-A browser-based bot simulation game with abilities, stickman animations, biome worlds, and a full world editor.
+A full simulation game with AI-powered abilities, Minecraft pixel theme, 3D isometric mode, mobs, crafting, building, skin shop, and more.
 
-## Deploy to Render (Static Site)
+## 🚀 Deploy to Render (Node.js Web Service)
 
-1. Push this repo to GitHub
-2. Go to [render.com](https://render.com) → New → Static Site
+1. Push all files to your GitHub repo (replace the old files)
+2. Go to **render.com** → New → **Web Service** (NOT Static Site)
 3. Connect your GitHub repo
-4. Set:
-   - **Name:** ability-game (or anything)
-   - **Build Command:** *(leave blank)*
-   - **Publish Directory:** `.`
-5. Click **Create Static Site**
-6. Done! Your game is live 🎉
+4. Settings:
+   - **Runtime:** Node
+   - **Build Command:** `npm install`
+   - **Start Command:** `node server.js`
+5. Add Environment Variable:
+   - Key: `ANTHROPIC_API_KEY`  Value: your API key (optional — game works without it using local AI)
+6. Click **Create Web Service**
+
+## 🔑 Developer Account
+- Username: `Kii`
+- Password: `KiiAkira098`
+- Unlocks: Dev Tools panel, background editor, set videos/images as background
+
+## 🤖 AI Abilities
+- With `ANTHROPIC_API_KEY`: Real AI parses ANY text, searches web for SCP entries, anime characters, game characters etc.
+- Without API key: Local parser handles 30+ ability types automatically
 
 ## Features
-- Sign up / log in system
-- Create & save multiple worlds
-- Random world generation (7 biomes)
-- Animated stickman bots
-- 30+ ability types (AI-parsed from text)
-- Mood/behavior system
-- Map editor (terrain, day/night, disasters)
-- 13 rule toggles
-- Auto-save every 60 seconds
-- Pinch-to-zoom, drag to pan
+- Minecraft pixel art theme throughout
+- 2D and 3D isometric toggle
+- 14 mob types (chicken, cow, shark, wolf, lion etc.)
+- Building & crafting system
+- Possess & control bots with joystick
+- Global skin shop with pixel editor
+- Disasters, weather, rules system
+- Auto-save + persistent login
+- Developer background editor
