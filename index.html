@@ -176,6 +176,9 @@ body{font-family:'Press Start 2P',monospace;color:var(--text);user-select:none;}
 .sname{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--gold);margin-bottom:3px;word-break:break-word;}
 .screator{font-family:'VT323',monospace;font-size:14px;color:var(--text2);}
 .sprice{font-family:'VT323',monospace;font-size:16px;color:var(--em);}
+.skin-preview-cv{display:block;margin:0 auto;border:2px solid var(--stone);background:#0D0905;image-rendering:pixelated;}
+.scard{background:#241508;border:3px solid var(--stone);padding:8px;width:calc(50% - 4px);cursor:pointer;box-shadow:2px 2px 0 #000;transition:border-color .1s;}
+.scard:hover{border-color:var(--gold);}
 /* PIXEL EDITOR */
 #PPX{top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,97vw);max-height:93vh;}
 .pxg{display:grid;grid-template-columns:repeat(16,1fr);gap:1px;background:#000;border:3px solid #000;}
@@ -331,6 +334,11 @@ body{font-family:'Press Start 2P',monospace;color:var(--text);user-select:none;}
       <textarea class="pta" id="EB" placeholder="e.g. aggressive, like SCP-096, always hungry..." style="min-height:42px"></textarea>
       <div class="pnote">🧠 AI interprets personality</div>
       <button class="pb2 G" onclick="G.aiBehav('edit')" style="margin:0;margin-top:3px">⚡ APPLY WITH AI</button>
+    </div>
+    <div class="phr"></div>
+    <span class="psec">👕 SKIN</span>
+    <div id="BOT_SKIN_SECTION" style="margin-bottom:8px">
+      <div style="font-family:VT323,monospace;font-size:14px;color:var(--text2)">Loading skins...</div>
     </div>
     <div class="p2c" style="margin-top:8px">
       <button class="pb2 G" onclick="G.applyBot()">✅ SAVE</button>
@@ -888,6 +896,27 @@ const G={
     ctx.globalAlpha=invis&&b!==this.selBot&&b!==this.possBot?.22:1;
     // Sprite
     ctx.save();ctx.translate(b.x,b.y);ctx.scale(b.dir*sc,sc);this.drawBotSprite(ctx,b);ctx.restore();
+    // Draw skin overlay if bot has one
+    if(b.skin){
+      const sk=b.skin;
+      const px=sk.views&&sk.views['FRONT']?sk.views['FRONT'].pixels:sk.pixels;
+      if(px&&Array.isArray(px)){
+        const sw=28*sc,sh=40*sc;
+        const sx=b.x-sw/2,sy=b.y-38*sc;
+        const pw=sw/16,ph=sh/16;
+        ctx.save();ctx.globalAlpha=.92;
+        px.forEach((col,i)=>{
+          if(col&&col!=='transparent'){
+            ctx.fillStyle=col;
+            ctx.fillRect(sx+(i%16)*pw,sy+Math.floor(i/16)*ph,pw,ph);
+          }
+        });
+        ctx.restore();
+      } else if(sk.views&&sk.views['FRONT']&&sk.views['FRONT'].imgData){
+        const img=new Image();img.src=sk.views['FRONT'].imgData;
+        if(img.complete){ctx.save();ctx.globalAlpha=.92;ctx.drawImage(img,b.x-14*sc,b.y-38*sc,28*sc,40*sc);ctx.restore();}
+      }
+    }
     ctx.globalAlpha=1;
     // ── NAME TAG with background ──
     const nameY=b.y-(52*sc);
@@ -1219,6 +1248,8 @@ const G={
     document.getElementById('EA').value=b.abilities||'';document.getElementById('EB').value=b.behavior||'';
     this.buildCP('EC',b.color||BCOLS[0]);this.renderTags(b.parsedAbil||[]);
     document.getElementById('PBOT').classList.add('ON');document.getElementById('PINF').classList.remove('ON');
+    // Load skin section
+    setTimeout(()=>this.renderBotSkinSection(),50);
   },
   closeBotPanel(){document.getElementById('PBOT').classList.remove('ON');},
   renderTags(abils){
@@ -1358,7 +1389,46 @@ const G={
       try{const r=await fetch('/api/skins');const data=await r.json();const skins=data.skins||[];
         if(!skins.length){el.innerHTML='<div style="font-family:VT323,monospace;font-size:16px;color:#8B5E3C">No skins yet — be first to publish!</div>';return;}
         el.innerHTML='<div class="sgrid"></div>';const grid=el.querySelector('.sgrid');
-        skins.forEach(s=>{const card=document.createElement('div');card.className='scard';card.innerHTML=`<div class="sname">${s.name}</div><div class="screator">by ${s.creator}</div><div class="sprice">💰 ${(s.price||0).toLocaleString()}</div><div style="font-family:VT323,monospace;font-size:13px;color:#8B5E3C">${s.downloads||0} downloads</div>`;card.onclick=()=>this.buySkin(s);grid.appendChild(card);});
+        skins.forEach(s=>{
+          const card=document.createElement('div');card.className='scard';
+          const owned=this.ownedSkins.includes(s.id);
+          // Build card HTML
+          card.innerHTML=`
+            <div style="position:relative;margin-bottom:6px;">
+              <canvas class="skin-preview-cv" width="16" height="16" style="width:56px;height:56px;display:block;margin:0 auto;image-rendering:pixelated;border:2px solid var(--stone);background:#0D0905;"></canvas>
+              ${owned?'<div style="position:absolute;top:0;right:0;background:var(--em);color:#000;font-family:Press Start 2P,monospace;font-size:5px;padding:2px 4px;">OWNED</div>':''}
+            </div>
+            <div class="sname">${s.name}</div>
+            <div class="screator">by ${s.creator}</div>
+            <div class="sprice">💰 ${(s.price||0).toLocaleString()}</div>
+            <div style="font-family:VT323,monospace;font-size:13px;color:#8B5E3C;margin-top:2px">${s.downloads||0} downloads</div>
+            <button class="pb2 ${owned?'G':'Au'}" style="margin-top:6px;margin-bottom:0;font-size:5px;padding:5px">${owned?'✅ APPLY TO BOT':'💰 BUY'}</button>`;
+          // Render skin preview onto canvas
+          const cv=card.querySelector('.skin-preview-cv');
+          if(cv){
+            const ctx2=cv.getContext('2d');
+            // Try front view pixels first, then legacy pixels
+            const viewData=s.views&&s.views['FRONT']?s.views['FRONT'].pixels:s.pixels;
+            if(viewData&&Array.isArray(viewData)){
+              viewData.forEach((col,i)=>{
+                if(col&&col!=='transparent'){ctx2.fillStyle=col;ctx2.fillRect(i%16,Math.floor(i/16),1,1);}
+              });
+            } else if(s.views&&s.views['FRONT']&&s.views['FRONT'].imgData){
+              // Image skin
+              const img=new Image();img.onload=()=>ctx2.drawImage(img,0,0,16,16);img.src=s.views['FRONT'].imgData;
+            } else {
+              // Fallback: draw colored stickman silhouette
+              ctx2.fillStyle=s.color||'#E74C3C';
+              ctx2.fillRect(6,0,4,4); // head
+              ctx2.fillRect(7,4,2,5); // body
+              ctx2.fillRect(5,4,2,3);ctx2.fillRect(9,4,2,3); // arms
+              ctx2.fillRect(6,9,2,4);ctx2.fillRect(8,9,2,4); // legs
+            }
+          }
+          card.querySelector('button').onclick=(e)=>{e.stopPropagation();owned?this.applySkinToBot(s):this.buySkin(s);};
+          card.onclick=()=>this.showSkinDetail(s);
+          grid.appendChild(card);
+        });
       } catch{el.innerHTML='<div style="font-family:VT323,monospace;font-size:16px;color:#E74C3C">Failed to load skins</div>';}
     } else if(tab==='anims'){
       el.innerHTML='';
@@ -1382,11 +1452,93 @@ const G={
     }
   },
   async buySkin(skin){
-    if(!confirm(`Buy "${skin.name}" for ${(skin.price||0).toLocaleString()} coins?`))return;
-    if(this.coins<(skin.price||0)){notify('❌ Not enough coins! You have '+this.coins);return;}
-    this.coins-=skin.price||0;this.ownedSkins.push(skin.id);
+    if(skin.price>0){
+      if(!confirm(`Buy "${skin.name}" for 💰 ${(skin.price||0).toLocaleString()} coins?`))return;
+      if(this.coins<skin.price){notify('❌ Not enough coins! You have '+this.coins);return;}
+      this.coins-=skin.price;
+    }
+    if(!this.ownedSkins.includes(skin.id))this.ownedSkins.push(skin.id);
+    // Store full skin data locally
+    const skins=DB.get('ag_skins_owned')||{};
+    skins[skin.id]=skin;
+    DB.set('ag_skins_owned',skins);
     try{await fetch('/api/skins/'+skin.id+'/buy',{method:'POST'});}catch{}
-    notify('✅ Bought '+skin.name+'!');if(this.selBot){this.selBot.skin=skin;notify('🎨 Applied to '+this.selBot.name);}
+    notify('✅ '+(skin.price>0?'Bought':'Got')+' '+skin.name+'!');
+    this.applySkinToBot(skin);
+    // Refresh shop
+    this.shopTab('skins');
+  },
+  applySkinToBot(skin){
+    if(!this.selBot&&!this.possBot){
+      notify('💡 Tap a bot first, then apply the skin!');return;
+    }
+    const b=this.selBot||this.possBot;
+    b.skin=skin;
+    notify('🎨 Skin "'+skin.name+'" applied to '+b.name+'!');
+    // Refresh bot edit panel if open
+    this.renderBotSkinSection();
+  },
+  showSkinDetail(skin){
+    const owned=this.ownedSkins.includes(skin.id);
+    this.mod(`<div class="mhdr"><span class="mtitle">👕 ${skin.name}</span><button class="mclose" onclick="G.closeMod()">X</button></div>
+      <div class="mbody">
+        <div style="text-align:center;margin-bottom:12px">
+          <canvas id="SKIN_DET_CV" width="16" height="16" style="width:80px;height:80px;image-rendering:pixelated;border:3px solid var(--dirt);background:#0D0905;"></canvas>
+        </div>
+        <div style="font-family:Press Start 2P,monospace;font-size:8px;color:var(--gold);margin-bottom:6px">${skin.name}</div>
+        <div style="font-family:VT323,monospace;font-size:16px;color:var(--text2)">by ${skin.creator}</div>
+        <div style="font-family:VT323,monospace;font-size:16px;color:var(--em)">💰 ${(skin.price||0).toLocaleString()} coins</div>
+        <div style="font-family:VT323,monospace;font-size:14px;color:var(--text2);margin-top:4px">${skin.description||''}</div>
+        <div style="font-family:VT323,monospace;font-size:14px;color:var(--text2)">${skin.downloads||0} downloads</div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+          ${owned?`<button class="pb2 G" style="flex:1;margin:0" onclick="G.applySkinToBot(${JSON.stringify(skin).replace(/"/g,'&quot;')});G.closeMod()">✅ APPLY TO BOT</button>`
+          :`<button class="pb2 Au" style="flex:1;margin:0" onclick="G.buySkin(${JSON.stringify(skin).replace(/"/g,'&quot;')});G.closeMod()">💰 BUY</button>`}
+          <button class="pb2" style="flex:1;margin:0" onclick="G.closeMod()">CLOSE</button>
+        </div>
+      </div>`);
+    // Render skin in modal
+    setTimeout(()=>{
+      const cv=document.getElementById('SKIN_DET_CV');if(!cv)return;
+      const ctx2=cv.getContext('2d');
+      const px=skin.views&&skin.views['FRONT']?skin.views['FRONT'].pixels:skin.pixels;
+      if(px&&Array.isArray(px)){px.forEach((col,i)=>{if(col&&col!=='transparent'){ctx2.fillStyle=col;ctx2.fillRect(i%16,Math.floor(i/16),1,1);}});}
+      else if(skin.views&&skin.views['FRONT']&&skin.views['FRONT'].imgData){
+        const img=new Image();img.onload=()=>ctx2.drawImage(img,0,0,16,16);img.src=skin.views['FRONT'].imgData;
+      }
+    },50);
+  },
+  renderBotSkinSection(){
+    const el=document.getElementById('BOT_SKIN_SECTION');if(!el)return;
+    const skins=DB.get('ag_skins_owned')||{};
+    const owned=Object.values(skins);
+    el.innerHTML='';
+    if(!owned.length){
+      el.innerHTML='<div style="font-family:VT323,monospace;font-size:14px;color:var(--text2)">No skins owned yet. Buy from 🏪 SHOP!</div>';
+      return;
+    }
+    owned.forEach(sk=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:2px solid var(--stone);cursor:pointer;';
+      const cv=document.createElement('canvas');cv.width=16;cv.height=16;
+      cv.style.cssText='width:32px;height:32px;image-rendering:pixelated;border:2px solid var(--stone);background:#0D0905;flex-shrink:0;';
+      const ctx2=cv.getContext('2d');
+      const px=sk.views&&sk.views['FRONT']?sk.views['FRONT'].pixels:sk.pixels;
+      if(px&&Array.isArray(px))px.forEach((col,i)=>{if(col&&col!=='transparent'){ctx2.fillStyle=col;ctx2.fillRect(i%16,Math.floor(i/16),1,1);}});
+      const info=document.createElement('div');
+      const b=this.selBot;
+      const isActive=b&&b.skin&&b.skin.id===sk.id;
+      info.innerHTML=`<div style="font-family:Press Start 2P,monospace;font-size:6px;color:${isActive?'var(--em)':'var(--gold)'}">${sk.name}${isActive?' ✅':''}</div><div style="font-family:VT323,monospace;font-size:13px;color:var(--text2)">by ${sk.creator}</div>`;
+      row.appendChild(cv);row.appendChild(info);
+      row.onclick=()=>{if(b){b.skin=sk;this.renderBotSkinSection();notify('🎨 Skin applied to '+b.name);}};
+      el.appendChild(row);
+    });
+    // Remove skin button
+    const b=this.selBot;
+    if(b&&b.skin){
+      const rm=document.createElement('button');rm.className='pb2 R';rm.style.cssText='margin-top:6px;margin-bottom:0;font-size:5px;padding:5px';rm.textContent='✕ REMOVE SKIN';
+      rm.onclick=()=>{b.skin=null;this.renderBotSkinSection();notify('Skin removed from '+b.name);};
+      el.appendChild(rm);
+    }
   },
   // ── SKIN EDITOR (multi-view) ──
   pxViews:['FRONT','BACK','LEFT','RIGHT','TOP','BOTTOM'],
